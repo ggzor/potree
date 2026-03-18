@@ -50,7 +50,7 @@ export class Viewer extends EventDispatcher{
 		this.messages = [];
 		this.elMessages = $(`
 		<div id="message_listing" 
-			style="position: absolute; z-index: 1000; left: 10px; bottom: 10px">
+			style="position: absolute; z-index: 1000; right: 10px; bottom: 10px">
 		</div>`);
 		$(domElement).append(this.elMessages);
 		
