@@ -87,15 +87,21 @@ export class InputHandler extends EventDispatcher {
 
 			this.startDragging(null);
 		} else if (e.touches.length === 2) {
+			let rect = this.domElement.getBoundingClientRect();
 			let t1 = e.touches[0];
 			let t2 = e.touches[1];
+
+			// Track midpoint for two-finger panning
+			let mx = (t1.pageX + t2.pageX) / 2 - rect.left;
+			let my = (t1.pageY + t2.pageY) / 2 - rect.top;
+			this.mouse.set(mx, my);
 
 			let dx = t1.pageX - t2.pageX;
 			let dy = t1.pageY - t2.pageY;
 			this.pinchStart = Math.sqrt(dx * dx + dy * dy);
-			this.drag = null;
 
-			this.rotateStart = Math.atan2(dy, dx);
+			// Start a drag from the midpoint so two-finger drag triggers panning
+			this.startDragging(null);
 		}
 
 		for (let inputListener of this.getSortedListeners()) {
@@ -124,7 +130,6 @@ export class InputHandler extends EventDispatcher {
 
 		this.drag = null;
 		this.pinchStart = null;
-		this.rotateStart = null;
 
 		for (let inputListener of this.getSortedListeners()) {
 			inputListener.dispatchEvent({
@@ -163,17 +168,37 @@ export class InputHandler extends EventDispatcher {
 				}
 			}
 		} else if (e.touches.length === 2) {
-			if (this.drag) {
-				this.drag = null;
-			}
-
+			let rect = this.domElement.getBoundingClientRect();
 			let t1 = e.touches[0];
 			let t2 = e.touches[1];
 
+			// Midpoint for two-finger panning
+			let mx = (t1.pageX + t2.pageX) / 2 - rect.left;
+			let my = (t1.pageY + t2.pageY) / 2 - rect.top;
+			this.mouse.set(mx, my);
+
+			// Dispatch drag from midpoint with MOUSE.RIGHT to trigger panning
+			if (this.drag) {
+				this.drag.mouse = 2;
+
+				this.drag.lastDrag.x = mx - this.drag.end.x;
+				this.drag.lastDrag.y = my - this.drag.end.y;
+
+				this.drag.end.set(mx, my);
+
+				for (let inputListener of this.getSortedListeners()) {
+					inputListener.dispatchEvent({
+						type: 'drag',
+						drag: this.drag,
+						viewer: this.viewer
+					});
+				}
+			}
+
+			// Pinch (distance change) for zooming
 			let dx = t1.pageX - t2.pageX;
 			let dy = t1.pageY - t2.pageY;
 			let currentDistance = Math.sqrt(dx * dx + dy * dy);
-			let currentAngle = Math.atan2(dy, dx);
 
 			if (this.pinchStart) {
 				let delta = currentDistance - this.pinchStart;
@@ -187,20 +212,7 @@ export class InputHandler extends EventDispatcher {
 				}
 			}
 
-			if (this.rotateStart) {
-				let angle = currentAngle - this.rotateStart;
-
-				for (let inputListener of this.getSortedListeners()) {
-					inputListener.dispatchEvent({
-						type: 'rotate',
-						angle: angle,
-						viewer: this.viewer
-					});
-				}
-			}
-
 			this.pinchStart = currentDistance;
-			this.rotateStart = currentAngle;
 		}
 
 		for (let inputListener of this.getSortedListeners()) {

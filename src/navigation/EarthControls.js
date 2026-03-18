@@ -52,6 +52,15 @@ export class EarthControls extends EventDispatcher {
 					this.pivotIndicator.visible = true;
 					this.pivotIndicator.position.copy(I.location);
 				}
+				// Fallback: if point cloud intersection failed, use the camera look-at target
+				// as the orbit pivot. This matches Benaco's behavior where orbiting happens
+				// around `view.lookingAt`, and prevents crashes on mobile touch where the
+				// intersection often fails.
+				if (!this.pivot) {
+					let view = this.viewer.scene.view;
+					this.pivot = view.getPivot();
+					this.camStart = this.scene.getActiveCamera().clone();
+				}
 			}
 
 			let camStart = this.camStart;
@@ -62,7 +71,7 @@ export class EarthControls extends EventDispatcher {
 			let mouse = e.drag.end;
 			let domElement = this.viewer.renderer.domElement;
 
-			if (e.drag.mouse === MOUSE.LEFT) {
+			if (e.drag.mouse === MOUSE.RIGHT) {
 
 				let ray = Utils.mouseToRay(mouse, camera, domElement.clientWidth, domElement.clientHeight);
 				let plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
@@ -90,14 +99,14 @@ export class EarthControls extends EventDispatcher {
 						this.viewer.setMoveSpeed(speed);
 					}
 				}
-			} else if (e.drag.mouse === MOUSE.RIGHT) {
+			} else if (e.drag.mouse === MOUSE.LEFT) {
 				let ndrag = {
 					x: e.drag.lastDrag.x / this.renderer.domElement.clientWidth,
 					y: e.drag.lastDrag.y / this.renderer.domElement.clientHeight
 				};
 
-				let yawDelta = -ndrag.x * this.rotationSpeed * 0.5;
-				let pitchDelta = -ndrag.y * this.rotationSpeed * 0.2;
+				let yawDelta = ndrag.x * this.rotationSpeed * 0.5;
+				let pitchDelta = ndrag.y * this.rotationSpeed * 0.2;
 
 				let originalPitch = view.pitch;
 				let tmpView = view.clone();
@@ -156,34 +165,6 @@ export class EarthControls extends EventDispatcher {
 
 		this.addEventListener('pinch', pinch);
 
-		let rotate = (e) => {
-			let view = this.viewer.scene.view;
-			let yawDelta = e.angle;
-			let pitchDelta = 0;
-
-			let originalPitch = view.pitch;
-			let tmpView = view.clone();
-			tmpView.pitch = tmpView.pitch + pitchDelta;
-			pitchDelta = tmpView.pitch - originalPitch;
-
-			let pivotToCam = new THREE.Vector3().subVectors(view.position, this.pivot);
-			let pivotToCamTarget = new THREE.Vector3().subVectors(view.getPivot(), this.pivot);
-			let side = view.getSide();
-
-			pivotToCam.applyAxisAngle(side, pitchDelta);
-			pivotToCamTarget.applyAxisAngle(side, pitchDelta);
-
-			pivotToCam.applyAxisAngle(new THREE.Vector3(0, 0, 1), yawDelta);
-			pivotToCamTarget.applyAxisAngle(new THREE.Vector3(0, 0, 1), yawDelta);
-
-			let newCam = new THREE.Vector3().addVectors(this.pivot, pivotToCam);
-
-			view.position.copy(newCam);
-			view.yaw += yawDelta;
-			view.pitch += pitchDelta;
-		};
-
-		this.addEventListener('rotate', rotate);
 	}
 
 	setScene (scene) {
